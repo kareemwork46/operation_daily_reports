@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Daily Report Entry</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding: 40px;
+        background-color: #f8f9fa;
+      }
+      table input {
+        width: 100%;
+        padding: 5px;
+      }
+      .btn {
+        margin-right: 10px;
+      }
+      .alert {
+        margin-top: 20px;
+      }
+      textarea.auto-resize {
+        min-height: 38px;
+        min-width: 100px;
+        width: 100%;
+        padding: 5px;
+        resize: both;
+        overflow: hidden;
+        box-sizing: border-box;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container shadow-sm bg-white p-4 rounded">
+      <h2 class="mb-4">📋 Daily Report - {{ date }}</h2>
+
+      <div id="message" class="alert alert-success d-none"></div>
+
+      <form id="dailyForm">
+        <div class="table-responsive">
+          <table class="table table-bordered align-middle text-center">
+            <thead class="table-light">
+              <tr>
+                <th rowspan="2">SN</th>
+                <th colspan="2">Location</th>
+                <th rowspan="2">Activity</th>
+                <th rowspan="2">Actual Qty Done</th>
+                <th colspan="4">Current Resources</th>
+                <th rowspan="2">Remarks</th>
+              </tr>
+              <tr>
+                <th>Building</th>
+                <th>Floor</th>
+                <th>Trade</th>
+                <th>Qty</th>
+                <th>Hrs.</th>
+                <th>Total Hrs.</th>
+              </tr>
+            </thead>
+            <tbody id="table-body">
+              {% for row in data %}
+              <tr>
+                <td><input name="sn" value="{{ row['SN'] or '' }}" /></td>
+                <td>
+                  <input
+                    name="location_building"
+                    value="{{ row['Location Building'] or '' }}"
+                  />
+                </td>
+                <td>
+                  <input
+                    name="location_floor"
+                    value="{{ row['Location Floor'] or '' }}"
+                  />
+                </td>
+                <td>
+                  <textarea name="activity" class="form-control auto-resize">
+{{ row['Activity'] or '' }}</textarea
+                  >
+                </td>
+                <td>
+                  <input
+                    name="actual_qty"
+                    value="{{ row['Actual Qty Done'] or '' }}"
+                  />
+                </td>
+                <td>
+                  <input
+                    name="trade"
+                    value="{{ row['Current Resources Trade'] or '' }}"
+                  />
+                </td>
+                <td>
+                  <input
+                    name="resource_qty"
+                    value="{{ row['Current Resources Qty'] or '' }}"
+                    oninput="calculateTotal(this)"
+                  />
+                </td>
+                <td>
+                  <input
+                    name="resource_hrs"
+                    value="{{ row['Current Resources Hrs.'] or 8 }}"
+                    oninput="calculateTotal(this)"
+                  />
+                </td>
+                <td>
+                  <input
+                    name="resource_total_hrs"
+                    value="{{ row['Current Resources Total Hrs.'] or '' }}"
+                    readonly
+                  />
+                </td>
+                <td>
+                  <input name="remarks" value="{{ row['Remarks'] or '' }}" />
+                </td>
+              </tr>
+              {% endfor %} {% for i in range(10 - data|length) %}
+              <tr>
+                <td><input name="sn" value="{{ data|length + i + 1 }}" /></td>
+                <td><input name="location_building" /></td>
+                <td><input name="location_floor" /></td>
+                <td><input name="activity" /></td>
+                <td><input name="actual_qty" /></td>
+                <td><input name="trade" /></td>
+                <td>
+                  <input name="resource_qty" oninput="calculateTotal(this)" />
+                </td>
+                <td>
+                  <input
+                    name="resource_hrs"
+                    value="8"
+                    oninput="calculateTotal(this)"
+                  />
+                </td>
+                <td><input name="resource_total_hrs" readonly /></td>
+                <td><input name="remarks" /></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="addRow()">
+          + Add Row
+        </button>
+        <button type="submit" class="btn btn-primary">💾 Save Report</button>
+      </form>
+
+      <hr />
+
+      <form action="/merge_weekly" method="get">
+        <button type="submit" class="btn btn-success">
+          📦 Download Weekly Merged Report
+        </button>
+      </form>
+    </div>
+
+    <script>
+      function calculateTotal(input) {
+        const row = input.closest("tr");
+        const qty =
+          parseFloat(row.querySelector('[name="resource_qty"]').value) || 0;
+        const hrs =
+          parseFloat(row.querySelector('[name="resource_hrs"]').value) || 0;
+        const total = qty * hrs;
+        row.querySelector('[name="resource_total_hrs"]').value = total;
+      }
+
+      function addRow() {
+        const tableBody = document.getElementById("table-body");
+        const currentRows = tableBody.querySelectorAll("tr").length;
+        const nextSN = currentRows + 1;
+
+        const row = document.createElement("tr");
+        row.innerHTML = `
+        <td><input name="sn" value="${nextSN}"></td>
+        <td><input name="location_building"></td>
+        <td><input name="location_floor"></td>
+        <td><input name="activity"></td>
+        <td><input name="actual_qty"></td>
+        <td><input name="trade"></td>
+        <td><input name="resource_qty" oninput="calculateTotal(this)"></td>
+        <td><input name="resource_hrs" value="8" oninput="calculateTotal(this)"></td>
+        <td><input name="resource_total_hrs" readonly></td>
+        <td><input name="remarks"></td>
+      `;
+        tableBody.appendChild(row);
+      }
+
+      document
+        .getElementById("dailyForm")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+          const formData = new FormData(this);
+          const response = await fetch("/submit", {
+            method: "POST",
+            body: formData,
+          });
+          const result = await response.text();
+          const messageBox = document.getElementById("message");
+          messageBox.innerText = result;
+          messageBox.classList.remove("d-none");
+        });
+    </script>
+  </body>
+</html>
